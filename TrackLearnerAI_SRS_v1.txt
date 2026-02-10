@@ -1,0 +1,282 @@
+SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
+
+Proje Adı: Track Learner AI
+Sürüm: 1.0
+Tarih: 05 Şubat 2026
+Hazırlayan: Kaan Güner
+
+1. Giriş
+
+1.1. Amaç
+Track Learner AI, 2D top-down bir yarış simülasyonu üzerinde, yapay zeka ajanlarının (araçların) Reinforcement Learning yaklaşımıyla ve özellikle NEAT (NeuroEvolution of Augmenting Topologies) algoritmasıyla bir pistte mümkün olan en hızlı turu öğrenmesini hedefleyen masaüstü bir uygulamadır. Bu SRS belgesi, ürünün v1 gereksinimlerini, kapsamını, arayüzlerini, veri yapılarını, performans hedeflerini ve kabul kriterlerini tanımlar.
+
+1.2. Kapsam ve Sürüm Planı
+Bu belgede v1 kapsamı “Hazır pist(ler) + NEAT eğitimi + görselleştirme + best run” olarak belirlenmiştir.
+Kullanıcı tarafından pist çizme/oluşturma (Track Designer) özelliği v1 kapsam dışıdır ve v1.1 (veya sonraki sürüm) özelliği olarak planlanmıştır.
+
+v1 (Bu SRS):
+- Hazır pist ile simülasyon ve eğitim
+- Aynı anda çoklu araç simülasyonu (popülasyon)
+- HUD ve eğitim metrikleri
+- Eğitim bitince “Best Lap Mode”
+
+v1.1 (Gelecek):
+- Pist çizim editörü
+- Pist kayıt/slot sistemi (maks. 5)
+- Başlangıç noktası ve yönünün kullanıcı tarafından belirlenmesi
+
+1.3. Tanımlar ve Kısaltmalar
+- NEAT: NeuroEvolution of Augmenting Topologies
+- Genome: NEAT tarafından evrimleştirilen ağ/topoloji + ağırlıklar
+- Fitness: Ajanın başarımını ölçen skor
+- Raycasting/Sensör: Araçtan farklı açılarda gönderilen ışınlarla pist sınırına mesafe ölçümü
+- Mask Collision: Pygame mask ile piksel bazlı çarpışma
+
+1.4. Hedef Kitle
+- Geliştirici(ler): Projeyi geliştirecek kişi/ekip
+- Değerlendiriciler: Demo izleyicileri, akademik jüri, takım arkadaşları
+- Son kullanıcı (v1.1 sonrası): Pist çizmek isteyen kullanıcı
+
+2. Genel Tanım
+
+2.1. Ürün Perspektifi
+Uygulama, Pygame üzerinde çalışan bir simülasyon döngüsüne sahiptir. Her “generation” boyunca bir popülasyondaki araçlar aynı pistte eşzamanlı sürer. Her aracın davranışı NEAT tarafından üretilen sinir ağı ile belirlenir. Araçların sensör verileri ağın girdisidir; direksiyon ve gaz/fren ağın çıktılarıdır. Araç pist dışına çıkınca “dead” olur ve simülasyondan çıkar.
+
+2.2. Ürün Fonksiyonları (Yüksek Seviye)
+- Hazır pist(ler)i yükleme ve render etme
+- Araç fiziğini simüle etme (hızlanma/sürtünme/dönüş)
+- 5 yönlü ray sensörleri ile algı üretme
+- Pist dışı/çarpışma tespiti
+- NEAT ile popülasyon evrimi ve fitness hesaplama
+- Eğitim metriklerini HUD’da gösterme
+- Eğitim bitince en iyi genome ile tek araç “best run” oynatma
+- Model/sonuç kayıtları (best genome) ve tekrar oynatma
+
+2.3. Kullanıcı Sınıfları ve Özellikleri
+v1’de kullanıcı, pist tasarlamaz. Kullanıcı uygulamayı çalıştırır ve eğitimi başlatır/durdurur, eğitim sonucunu izler.
+v1.1’de kullanıcı pist çizebilen “Track Designer” moduna sahip olacaktır.
+
+2.4. Varsayımlar ve Bağımlılıklar
+- Python 3.10+ kurulu olmalıdır
+- Pygame 2.5+ sürümü kullanılacaktır
+- neat-python kütüphanesi kullanılacaktır
+- Fizik, gerçekçi otomotiv fiziği değil; öğrenmeyi kolaylaştıran basit bir 2D kinematik model olacaktır
+- Hazır pist dosyası uygulama içinde assets/data ile birlikte gelecektir
+
+3. Teknik Yığın (Tech Stack)
+
+3.1. Programlama Dili
+- Python 3.10+
+
+3.2. Oyun/Render ve Input
+- Pygame (2.5+)
+Kullanım alanları:
+- Ekran çizimi (pist, araçlar, sensör ışınları, HUD)
+- Klavye/mouse input (start/stop, speed control, debug)
+- Mask collision / pixel collision
+
+3.3. Yapay Zeka
+- neat-python
+Kullanım alanları:
+- Popülasyon yönetimi
+- Genome değerlendirme
+- Evrimsel süreç (seçilim, çaprazlama, mutasyon)
+
+3.4. Matematik
+- NumPy
+Kullanım alanları:
+- Vektör hesapları, açı dönüşümleri
+- Sensör yönleri ve mesafe hesapları
+- Performans için toplu işlemler (opsiyonel)
+
+3.5. Veri Yönetimi
+- Pickle: Best genome kaydı (.pkl)
+- JSON: Pist konfigürasyonu ve metadata (v1’de hazır pistler için de kullanılabilir)
+
+4. Dış Arayüz Gereksinimleri
+
+4.1. Kullanıcı Arayüzü (UI)
+v1’de minimum UI şu bileşenleri içermelidir:
+- Ana ekran veya simülasyon ekranı: pist + popülasyon araçları
+- Eğitim kontrolü: Start / Pause / Reset (klavye kısayolları da olabilir)
+- Debug seçenekleri: sensör çizimini aç/kapat, hız artır/azalt (opsiyonel)
+
+HUD üzerinde gösterilecekler:
+- Generation: mevcut nesil numarası
+- Alive Cars: hayatta kalan araç sayısı
+- Max Fitness: o ana kadarki en yüksek fitness
+- Time / Steps: episode süresi ya da adım sayısı (opsiyonel)
+- Best Lap Time (varsa): eğitim süresince kaydedilen en iyi tur
+
+4.2. Donanım Arayüzleri
+- Standart klavye ve ekran yeterlidir. GPU zorunlu değildir.
+
+4.3. Yazılım Arayüzleri
+- neat-python API (config dosyası + evaluator)
+- Pygame surfaces ve masks
+
+5. Fonksiyonel Gereksinimler (FR)
+
+FR-1 Pist Yükleme ve Gösterim
+- Sistem en az 1 adet hazır pisti yükleyebilmelidir.
+- Pist görseli ekrana çizilmelidir (track surface).
+- Pist sınırları çarpışma için Pygame Mask olarak tutulmalıdır.
+
+FR-2 Araç Oluşturma ve Popülasyon Simülasyonu
+- Her generation’da minimum 30 araç aynı anda simüle edilmelidir.
+- Her araç için durum (position, heading, speed, alive) tutulmalıdır.
+- “Dead” olan araçlar simülasyondan çıkarılmalı veya şeffaf/render dışı yapılmalıdır.
+
+FR-3 Araç Fiziği
+Araçlar aşağıdaki basit fizik kurallarını uygulamalıdır:
+- Hızlanma: throttle ile hız artışı
+- Sürtünme: throttle yokken hızın düşmesi
+- Maksimum hız limiti
+- Dönüş: steering girdisine göre heading değişimi, dönüş hıza bağlı ölçeklenebilir (opsiyonel)
+
+FR-4 Sensör Sistemi (Raycasting)
+- Araçtan 5 farklı açıda ışın gönderilmelidir: -45°, -22°, 0°, +22°, +45°
+- Her ışın pist sınırına ilk çarptığı noktaya kadar mesafeyi hesaplamalıdır.
+- Sensör verileri normalize edilmelidir (0..1 aralığı gibi).
+- Sensör çizimi debug modunda ekranda gösterilebilir.
+
+FR-5 Çarpışma ve Ölüm Koşulu
+- Araç pist dışına temas ettiği anda “dead” olmalıdır.
+- Pist dışı tespiti, mask collision veya pist rengi bazlı kontrol ile yapılmalıdır.
+- Dead olan aracın fitness’i o anki değeriyle finalize edilmelidir.
+
+FR-6 NEAT Entegrasyonu
+- NEAT config dosyası ile popülasyon başlatılmalıdır.
+- Her genome için bir sinir ağı oluşturulmalı ve araç davranışı bu ağdan üretilmelidir.
+- Generation sonunda NEAT, fitness değerlerine göre yeni nesli üretmelidir.
+
+FR-7 Girdi/Çıktı Tanımları (Brain I/O)
+Girdiler (Inputs):
+- 5 sensör mesafesi (normalize)
+Opsiyonel v1+ (gelecek): hız, heading farkı, progress
+
+Çıktılar (Outputs):
+- Steering: sola/sağa dönüş (sürekli değer)
+- Throttle/Brake: gaz-fren (tek eksen veya iki ayrı değer)
+
+FR-8 Fitness Fonksiyonu
+v1 fitness fonksiyonu, aracı “pist üzerinde ilerlemeye ve stabil hızlanmaya” teşvik etmelidir.
+
+Önerilen v1 fitness:
+- Fitness = (İlerleme Skoru) + (Ortalama Hız × 0.5) - (Çarpışma Cezası)
+
+İlerleme Skoru tanımı (v1 için net şart):
+- Araç pist üzerinde kat ettiği toplam yol / checkpoint ilerlemesi ile ölçülmelidir.
+- “Daire çizip aynı yerde dönme” gibi exploit’leri azaltmak için ilerleme tek yönlü takip edilmelidir (progress monotonic veya checkpoint sistemi).
+
+Çarpışma Cezası:
+- Dead anında sabit ceza veya fitness düşüşü uygulanabilir.
+
+FR-9 Eğitim Akışı ve Durma Koşulları
+- Eğitim, belirlenen generation sayısına ulaşınca durmalıdır (örn. 50/100).
+- Opsiyonel: belirli bir “best lap time” hedefi yakalanırsa erken durdurma.
+
+FR-10 Best Genome Kaydı ve Best Lap Mode
+- Eğitim sonunda en iyi genome pickle ile kaydedilmelidir.
+- “Best Lap Mode”da bu genome tek araçla piste çıkarılmalı ve tur atışı izlenebilmelidir.
+- Best run sırasında sensör çizimi opsiyonel olarak açılabilir.
+
+6. Veri Gereksinimleri ve Dosya Formatları
+
+6.1. Track Format (v1)
+v1’de pistler uygulama ile birlikte gelir. Pist tanımı en az şunları içermelidir:
+- Track image (png) veya surface üretim parametreleri
+- Collision mask üretimi için kaynak (png veya çizim)
+- Start position: (x, y)
+- Start heading: açı/derece
+
+Opsiyonel: JSON metadata
+- track_id, name, author, created_at
+- start_position, start_heading
+- recommended_sensor_range, width_hint
+
+6.2. Model Kaydı
+- best_genome.pkl: pickle formatında en iyi genome
+- (opsiyonel) training_summary.json: generation sayısı, max fitness, best lap time, config hash
+
+7. Mimari ve Klasör Yapısı
+
+Önerilen proje yapısı (temize çekilmiş):
+
+TrackLearnerAI/
+- assets/
+  - car.png
+  - icon.png
+  - tracks/
+    - track1.png
+- config/
+  - config-feedforward.txt
+- data/
+  - best_brains/
+    - best_genome.pkl
+  - logs/
+    - training_summary.json
+- docs/
+  - SRS_v1.md
+  - ARCHITECTURE.md
+- src/
+  - __init__.py
+  - core.py          (game loop, screen, states)
+  - track.py         (track loading, mask, start point)
+  - car.py           (physics, sensors, collision)
+  - ai_manager.py    (NEAT integration, evaluation loop)
+  - render.py        (drawing helpers, HUD)
+  - utils.py         (math, raycast, helpers)
+- main.py
+- requirements.txt
+
+Not: v1.1 geldiğinde editor.py ve data/tracks/ slot sistemi eklenecek.
+
+8. Non-Functional Requirements (NFR)
+
+NFR-1 Performans
+- 30 aracı aynı anda en az 30 FPS hedefiyle simüle edebilmelidir (orta seviye laptop).
+- Raycasting ve collision hesapları FPS’i aşırı düşürmemelidir.
+
+NFR-2 Kullanılabilirlik
+- Start/Pause/Reset kontrolleri açık ve anlaşılır olmalıdır.
+- HUD okunabilir olmalıdır.
+
+NFR-3 Güvenilirlik
+- Uygulama çökmemeli; hatalarda anlamlı mesaj/log üretmelidir.
+- Model/track dosyası yoksa varsayılan değerlerle çalışabilmelidir.
+
+NFR-4 Taşınabilirlik
+- Windows ve macOS üzerinde çalışması hedeflenir (Python + pygame).
+- Platforma özel path sorunları için pathlib kullanılmalıdır.
+
+NFR-5 Bakım Kolaylığı
+- Modüler mimari: physics, AI, render ayrışmalı
+- Temel fonksiyonlar için unit test (en az utils/raycast/progress hesapları) önerilir
+
+9. Hata Yönetimi ve Loglama
+- Eksik track dosyası: “default track” yükle ve uyarı ver
+- Config dosyası hatası: neat config parse hatasını logla ve uygulamayı güvenli şekilde sonlandır
+- Pickle kaydı hatası: “write permission” uyarısı ve eğitim çıktısını ekranda göster
+
+10. Test Planı ve Kabul Kriterleri (v1)
+
+Kabul Kriterleri:
+- Hazır pist ekranda düzgün görünür ve araçlar pist üzerinde spawn olur
+- 30 araç aynı anda simüle edilir ve dead olanlar devre dışı kalır
+- 5 sensör ışını hesaplanır (debug çizimiyle doğrulanabilir)
+- NEAT en az 10 generation çalışır, max fitness ekranda güncellenir
+- Eğitim sonunda best_genome.pkl üretilir
+- Best Lap Mode’da tek araç en iyi genome ile sürer ve tekrar izlenebilir
+
+Minimum Test Senaryoları:
+- T1: Track load + mask collision doğru mu? (duvara sür, öl)
+- T2: Sensör mesafeleri doğru mu? (duvara yaklaşınca değer düşüyor mu?)
+- T3: NEAT loop: generation geçişleri stabil mi?
+- T4: Best genome kaydı ve tekrar yükleme çalışıyor mu?
+
+11. Gelecek Çalışmalar (v1.1+)
+- Track Designer: siyah tuval, beyaz fırça, mask üretimi
+- 5 track slot, save/load, clear
+- Start point ve heading UI ile seçimi
+- Eğitim sonuçlarının track bazlı saklanması ve “leaderboard” ekranı
