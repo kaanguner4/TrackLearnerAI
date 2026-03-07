@@ -54,16 +54,15 @@ class AIManager:
     Handles evaluation, fitness calculation, and model persistence
     """
 
-    def __init__(self, config_path="config/config-feedforward.txt", pop_size=30):
+    def __init__(self, config_path="config/config-feedforward.txt", pop_size=None):
         """
         Initialize AI manager with NEAT config
 
         Args:
             config_path: Path to NEAT config file
-            pop_size: Population size (overrides config if specified)
+            pop_size: Population size (if None, uses config file value)
         """
         self.config_path = config_path
-        self.pop_size = pop_size
 
         # Load NEAT configuration
         if not os.path.exists(config_path):
@@ -77,9 +76,11 @@ class AIManager:
             config_path,
         )
 
-        # Optionally override population size
-        if pop_size > 0:
+        # Override population size if specified
+        if pop_size is not None:
             config.pop_size = pop_size
+
+        self.pop_size = config.pop_size
 
         # Create population
         self.population = neat.Population(config)

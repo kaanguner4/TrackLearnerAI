@@ -54,14 +54,29 @@ class Track:
 
     def _find_valid_start_position(self):
         """Find a valid starting position on the track"""
-        # Search for a white pixel to start from
-        for y in range(self.height // 3, self.height // 2):
-            for x in range(self.width // 4, 3 * self.width // 4):
+        # Search for a white pixel to start from (drivable area)
+        # Check middle-left area of the track
+        for y in range(self.height // 3, 2 * self.height // 3):
+            for x in range(self.width // 3, 2 * self.width // 3):
                 if self.is_on_track(x, y):
                     self.start_x = x
                     self.start_y = y
                     print(f"✓ Valid start position found: ({x}, {y})")
                     return
+
+        # Fallback: search entire image
+        print("⚠ Searching entire track for valid start position...")
+        for y in range(0, self.height, 10):
+            for x in range(0, self.width, 10):
+                if self.is_on_track(x, y):
+                    self.start_x = x
+                    self.start_y = y
+                    print(f"✓ Valid start position found at: ({x}, {y})")
+                    return
+
+        print("⚠ Warning: No valid start position found. Using checkpoint area.")
+        self.start_x = self.width // 2
+        self.start_y = self.height // 2
 
     def is_on_track(self, x, y):
         """
