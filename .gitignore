@@ -205,3 +205,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# TrackLearnerAI
+.DS_Store
+*.pkl
+data/logs/*
+!data/logs/.gitkeep
+data/best_brains/*
+!data/best_brains/.gitkeep
