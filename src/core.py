@@ -59,9 +59,7 @@ class SimulationEngine:
         self.config = self.ai_manager.get_config()
 
         # Progress tracking
-        self.progress_tracker = ProgressTracker(
-            self.track.width, self.track.height, num_checkpoints=50
-        )
+        self.progress_tracker = ProgressTracker(self.track)
 
         # Training parameters
         self.max_generations = max_generations
@@ -137,10 +135,13 @@ class SimulationEngine:
             steering, throttle = brain.forward(sensors)
 
             # Update car physics
+            previous_pos = car.get_position()
             car.update(steering, throttle, dt)
 
             # Calculate fitness
-            progress = self.progress_tracker.calculate_progress(car.car_id, car.get_position())
+            progress = self.progress_tracker.calculate_progress(
+                car.car_id, car.get_position(), previous_pos
+            )
             avg_speed = car.get_average_speed()
             is_dead = not car.is_alive()
 
@@ -179,6 +180,7 @@ class SimulationEngine:
         start_heading = self.track.get_start_heading()
         for car in self.cars:
             car.reset(start_x, start_y, start_heading)
+            self.progress_tracker.reset_car(car.car_id)
 
         # Check if training is done
         if self.generation >= self.max_generations:

@@ -52,6 +52,9 @@ class Car:
         self.lifetime_steps = 0
         self.total_speed_accumulated = 0
 
+        # Prime sensors at spawn so the first network decision uses real distances.
+        self._update_sensors()
+
     def update(self, steering_input, throttle_input, dt=1.0):
         """
         Update car physics
@@ -171,4 +174,4 @@ class Car:
         self.total_distance = 0
         self.lifetime_steps = 0
         self.total_speed_accumulated = 0
-        self.sensor_values = [0] * 5
+        self._update_sensors()

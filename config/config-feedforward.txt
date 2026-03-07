@@ -36,6 +36,8 @@ conn_delete_prob        = 0.5
 ; connection attributes
 feed_forward            = true
 initial_connection      = full
+enabled_default         = true
+enabled_mutate_rate     = 0.01
 
 ; node add/remove rates
 node_add_prob           = 0.2

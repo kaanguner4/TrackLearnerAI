@@ -32,7 +32,7 @@ class CarBrain:
             sensor_inputs: list of 5 normalized sensor values (0..1)
 
         Returns:
-            (steering, throttle) tuple, both in range -1..1
+            (steering, throttle) tuple; steering in -1..1, throttle in 0.1..1
         """
         outputs = self.network.activate(sensor_inputs)
         steering = None
@@ -40,7 +40,8 @@ class CarBrain:
 
         if len(outputs) >= 2:
             steering = max(-1.0, min(1.0, outputs[0]))
-            throttle = max(-1.0, min(1.0, outputs[1]))
+            # Keep cars moving forward so training consistently progresses clockwise.
+            throttle = max(0.1, min(1.0, (outputs[1] + 1.0) / 2.0))
         else:
             steering = 0
             throttle = 0
@@ -149,11 +150,12 @@ class AIManager:
                     steering, throttle = brain.forward(sensors)
 
                     # Update car physics
+                    previous_pos = car.get_position()
                     car.update(steering, throttle, dt=1.0)
 
                     # Update progress
                     progress = progress_tracker.calculate_progress(
-                        car.car_id, car.get_position()
+                        car.car_id, car.get_position(), previous_pos
                     )
 
                     # Calculate fitness incrementally
