@@ -26,7 +26,13 @@ class Track:
         if not os.path.exists(track_path):
             raise FileNotFoundError(f"Track file not found: {track_path}")
 
-        self.image = pygame.image.load(track_path).convert()
+        self.image = pygame.image.load(track_path)
+        # Use convert_alpha() for better compatibility, falls back to plain load if needed
+        try:
+            self.image = self.image.convert_alpha()
+        except pygame.error:
+            pass  # Display mode not set yet, will be converted after display init
+
         self.width, self.height = self.image.get_size()
         print(f"✓ Track loaded: {track_path} ({self.width}x{self.height})")
 

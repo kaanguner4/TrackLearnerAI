@@ -44,9 +44,15 @@ class SimulationEngine:
             max_generations: Training iterations
             max_steps_per_generation: Max steps per generation
         """
-        # Track and rendering
+        # Create renderer first to initialize pygame display
+        import pygame as pg
+        temp_img = pg.image.load(track_path)
+        temp_width, temp_height = temp_img.get_size()
+
+        self.renderer = Renderer(temp_width, temp_height)
+
+        # Now load track with display mode set
         self.track = Track(track_path, sensor_range=500)
-        self.renderer = Renderer(*self.track.get_size())
 
         # AI and training
         self.ai_manager = AIManager(neat_config, pop_size)
