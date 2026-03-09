@@ -82,3 +82,22 @@ class Agent:
                 radar_pos = (radar[0], radar[1])
                 pygame.draw.line(screen, (0, 255, 255), (int(self.x), int(self.y)), radar_pos, 1)
     
+
+
+if __name__ == "__main__":
+    # Test için track_env dosyasındaki sınıfı buraya import etmemiz gerekir
+    import track_env 
+    
+    print("Sınıflar test ediliyor...")
+    
+    # 1. Önce çevreyi (Environment) oluşturuyoruz
+    track_env.TrackEnvironment("assets/tracks/track1.png") 
+    
+    # 2. Ajanı (Agent) oluştururken bu çevre nesnesini veriyoruz
+    agent = Agent((100, 100), track_env.TrackEnvironment("assets/tracks/track1.png")) # Başlangıç pozisyonu (100, 100) olarak belirlendi
+    
+    # 3. Ajanın sensörlerini bir kereliğine manuel tetikliyoruz (veya update çağırıyoruz)
+    agent._update_radars()
+    
+    # 4. Veriyi kontrol ediyoruz
+    print("Agent sensör verileri ve hız:", agent.get_data())

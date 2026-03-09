@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import math
 
-class TrackEnviroment:
+class TrackEnvironment:
     def __init__(self, image_path):
         # Görseli OpenCV ile okuyoruz
         self.track_image = cv2.imread(image_path)
@@ -92,5 +92,5 @@ class TrackEnviroment:
         return False
     
     
-print("TrackEnviroment sınıfı başarıyla tanımlandı.")
-print("checkpoint koordinatları:", TrackEnviroment("assets/tracks/track1.png").checkpoints)
+print("TrackEnvironment sınıfı başarıyla tanımlandı.")
+print("checkpoint koordinatları:", TrackEnvironment("assets/tracks/track1.png").checkpoints)
