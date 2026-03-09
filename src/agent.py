@@ -19,7 +19,7 @@ class Agent:
 
         self.width = 20
         self.height = 10
-        self.color = (0, 255, 0) 
+        self.color = (0, 0, 0) # Sarı
 
     def update(self):
         if not self.is_alive:
@@ -81,4 +81,4 @@ class Agent:
             pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), 5)
             for radar in self.radars:
                 radar_pos = (radar[0], radar[1])
-                pygame.draw.line(screen, (0, 255, 255), (int(self.x), int(self.y)), radar_pos, 1)
+                pygame.draw.line(screen, (255, 0, 255), (int(self.x), int(self.y)), radar_pos, 1) # Mor radar çizgisi
