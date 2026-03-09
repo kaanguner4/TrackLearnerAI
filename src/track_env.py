@@ -4,93 +4,147 @@ import math
 
 class TrackEnvironment:
     def __init__(self, image_path):
-        # Görseli OpenCV ile okuyoruz
         self.track_image = cv2.imread(image_path)
         self.height, self.width, _ = self.track_image.shape
     
-        # Yapay zekanın kullanacağı matrisler (maskeler)
         self.border_mask = None
         self.checkpoint_mask = None
         self.finish_line_mask = None
-        self.checkpoints = [] # Sıralı checkpoint koordinatları
+        # Checkpointler artık sadece merkez değil, çizginin iki ucunu da tutan sözlükler olacak
+        self.checkpoints = [] 
+        self.finish_line = None 
 
         self._process_track()
     
     def _process_track(self):
-        # Renkleri daha net ayırmak için BGR'dan HSV renk uzayına geçiyoruz
         hsv_img = cv2.cvtColor(self.track_image, cv2.COLOR_BGR2HSV)
 
-        # 1. SİYAJ RENK: Sınırları belirlemek için
+        # 1. SİYAH RENK: Sınırlar
         lower_black = np.array([0, 0, 0])
         upper_black = np.array([180, 255, 50])
         self.border_mask = cv2.inRange(hsv_img, lower_black, upper_black)
 
-        # 2. MAVİ RENK: Checkpoint'leri belirlemek için
+        # 2. MAVİ RENK: Checkpoint Çizgileri
         lower_blue = np.array([90, 50, 50])
         upper_blue = np.array([130, 255, 255])
         self.checkpoint_mask = cv2.inRange(hsv_img, lower_blue, upper_blue)
 
-        # Mavi çizgilerin her birinin merkez koordinatını hesaplama
         contours, _ = cv2.findContours(self.checkpoint_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
         raw_checkpoints = []
         for contour in contours:
-            if cv2.contourArea(contour) > 10: # Küçük gürültüleri filtrelemek için alan sınırı
+            if cv2.contourArea(contour) > 10: 
+                # Çizginin başlangıç ve bitiş noktalarını (en uzak iki nokta) bulalım
+                hull = cv2.convexHull(contour)
+                max_d = -1
+                p1, p2 = (0,0), (0,0)
+                for i in range(len(hull)):
+                    for j in range(i+1, len(hull)):
+                        d = math.hypot(hull[i][0][0] - hull[j][0][0], hull[i][0][1] - hull[j][0][1])
+                        if d > max_d:
+                            max_d = d
+                            p1 = tuple(hull[i][0])
+                            p2 = tuple(hull[j][0])
+
                 M = cv2.moments(contour)
                 if M["m00"] != 0:
-                    contour_x = int(M["m10"] / M["m00"])
-                    contour_y = int(M["m01"] / M["m00"])
-                    raw_checkpoints.append((contour_x, contour_y))
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
+                    raw_checkpoints.append({'center': (cx, cy), 'p1': p1, 'p2': p2})
 
-        # 3. Kırmızı Çizgiyi (Başlangıç/Bitiş) Bulma
+        # 3. Kırmızı Çizgi (Bitiş)
         lower_red1 = np.array([0, 70, 50])
         upper_red1 = np.array([10, 255, 255])
         lower_red2 = np.array([170, 70, 50])
         upper_red2 = np.array([180, 255, 255])
         self.finish_line_mask = cv2.bitwise_or(cv2.inRange(hsv_img, lower_red1, upper_red1), cv2.inRange(hsv_img, lower_red2, upper_red2))
 
-        # Kırmızı çizginin merkez koordinatını bulma
         contours, _ = cv2.findContours(self.finish_line_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             largest_contour = max(contours, key=cv2.contourArea)
+            hull = cv2.convexHull(largest_contour)
+            max_d = -1
+            p1, p2 = (0,0), (0,0)
+            for i in range(len(hull)):
+                for j in range(i+1, len(hull)):
+                    d = math.hypot(hull[i][0][0] - hull[j][0][0], hull[i][0][1] - hull[j][0][1])
+                    if d > max_d:
+                        max_d = d
+                        p1 = tuple(hull[i][0])
+                        p2 = tuple(hull[j][0])
+
             M = cv2.moments(largest_contour)
             if M["m00"] != 0:
-                self.finish_line = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                self.finish_line = {'center': (cx, cy), 'p1': p1, 'p2': p2}
 
-        # 4. Checkpoint'leri sıralama (finish line'a olan uzaklığa göre) / (Saat yönünde dizmek için merkeze göre açı hesaplıyoruz)
-        center_x, center_y = self.width // 2, self.height // 2
+        # 4. Sıralama
+        if raw_checkpoints and self.finish_line is not None:
+            self.checkpoints = self._sort_checkpoints_by_path(raw_checkpoints, self.finish_line)
+        else:
+            self.checkpoints = raw_checkpoints
 
-        def angle_from_center(point):
-            x, y = point
-            # atan2 fonksiyonu, merkeze göre açıyı radyan cinsinden verir (-pi ile pi arası)
-            return math.atan2(y - center_y, x - center_x)
+    def _sort_checkpoints_by_path(self, raw_checkpoints, start_point):
+        remaining = list(raw_checkpoints)
+        sorted_cps = []
+        current_center = start_point['center']
 
-        # Checkpoint'leri açısal olarak sıralama
-        self.checkpoints = sorted(raw_checkpoints, key=angle_from_center, reverse=False)
+        while remaining:
+            nearest_idx = 0
+            nearest_dist = math.hypot(remaining[0]['center'][0] - current_center[0], remaining[0]['center'][1] - current_center[1])
+            for i in range(1, len(remaining)):
+                d = math.hypot(remaining[i]['center'][0] - current_center[0], remaining[i]['center'][1] - current_center[1])
+                if d < nearest_dist:
+                    nearest_dist = d
+                    nearest_idx = i
+
+            nearest_cp = remaining.pop(nearest_idx)
+            sorted_cps.append(nearest_cp)
+            current_center = nearest_cp['center']
+
+        signed_area = 0
+        n = len(sorted_cps)
+        for i in range(n):
+            x1, y1 = sorted_cps[i]['center']
+            x2, y2 = sorted_cps[(i + 1) % n]['center']
+            signed_area += (x2 - x1) * (y2 + y1)
+
+        if signed_area > 0:
+            sorted_cps.reverse()
+
+        return sorted_cps
 
     def check_collision(self, x , y):
-        # Ajan resim sınırları içinde mi? Değilse direkt çarpmış say.
         if 0 <= int(x) < self.width and 0 <= int(y) < self.height:
-            return self.border_mask[int(y), int(x)] == 255 # Sınır maskesinde beyaz (255) ise çarpışma var demektir
-        return True # Resim sınırları dışında ise çarpışma var
+            return self.border_mask[int(y), int(x)] == 255 
+        return True 
     
-    def is_checkpoint_passed(self, agent_x, agent_y, target_checkpoint_index):
-        # Araba hedef checkpoint'in etki alanına (örn: 25 piksel yakınına) girdi mi?
-        if target_checkpoint_index < len(self.checkpoints):
-            checkpoint_x, checkpoint_y = self.checkpoints[target_checkpoint_index]
-            distance = math.hypot(agent_x - checkpoint_x, agent_y - checkpoint_y)
-            if distance < 25: # Checkpoint'e 25 piksel yaklaşıldığında geçilmiş sayılır
-                return True
+    # İki çizgi parçasının kesişip kesişmediğini bulan matematiksel vektör algoritması
+    @staticmethod
+    def _ccw(A, B, C):
+        return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
+    @staticmethod
+    def _segments_intersect(A, B, C, D):
+        return TrackEnvironment._ccw(A, C, D) != TrackEnvironment._ccw(B, C, D) and \
+               TrackEnvironment._ccw(A, B, C) != TrackEnvironment._ccw(A, B, D)
+
+    # Artık çember (yarıçap) yok. Arabanın eski ve yeni konumu çizgiyi kesiyor mu diye bakıyoruz
+    def is_checkpoint_passed(self, prev_x, prev_y, curr_x, curr_y, target_index):
+        if target_index < len(self.checkpoints):
+            cp = self.checkpoints[target_index]
+            A = (prev_x, prev_y) # Arabanın bir önceki karedeki yeri
+            B = (curr_x, curr_y) # Arabanın şu anki yeri
+            C = cp['p1']         # Checkpoint çizgisinin 1. ucu
+            D = cp['p2']         # Checkpoint çizgisinin 2. ucu
+            return self._segments_intersect(A, B, C, D)
         return False
     
-    def is_finish_line_crossed(self, agent_x, agent_y):
-        # Arava bitiş çizgisini geçti mi? (Çizgiye 25 piksel yaklaşıldığında geçilmiş sayılır)
+    def is_finish_line_crossed(self, prev_x, prev_y, curr_x, curr_y):
         if self.finish_line is not None:
-            distance = math.hypot(agent_x - self.finish_line[0], agent_y - self.finish_line[1])
-            if distance < 25:
-                return True
+            A = (prev_x, prev_y)
+            B = (curr_x, curr_y)
+            C = self.finish_line['p1']
+            D = self.finish_line['p2']
+            return self._segments_intersect(A, B, C, D)
         return False
-    
-    
-print("TrackEnvironment sınıfı başarıyla tanımlandı.")
-print("checkpoint koordinatları:", TrackEnvironment("assets/tracks/track1.png").checkpoints)
