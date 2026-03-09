@@ -1,0 +1,6 @@
+pygame==2.5.2
+neat-python==0.92
+opencv-python==4.9.0.80
+numpy==1.26.4
+graphviz==0.20.1
+matplotlib==3.8.3
