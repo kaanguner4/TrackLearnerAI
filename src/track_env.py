@@ -70,7 +70,7 @@ class TrackEnviroment:
 
     def check_collision(self, x , y):
         # Ajan resim sınırları içinde mi? Değilse direkt çarpmış say.
-        if x <= int(x) < self.width and 0 <= int(y) < self.height:
+        if 0 <= int(x) < self.width and 0 <= int(y) < self.height:
             return self.border_mask[int(y), int(x)] == 255 # Sınır maskesinde beyaz (255) ise çarpışma var demektir
         return True # Resim sınırları dışında ise çarpışma var
     
