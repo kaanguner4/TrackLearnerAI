@@ -86,8 +86,9 @@ def main():
         # --- TUR (FINISH) SAYACI MANTIĞI ---
         # Eski finish_line crossed mantığı yerine çizgi kesişimi ile tur ölçümü yapıyoruz
         if env.is_finish_line_crossed(agent.prev_x, agent.prev_y, agent.x, agent.y):
-            lap_count += 1
-            agent.current_checkpoint = 0 # Yeni tur!
+            if agent.current_checkpoint == 62:
+                lap_count += 1
+                agent.current_checkpoint = 0 # Yeni tur!
 
         # --- ÇİZİM AŞAMASI (Sanal Yüzeye Yapılır) ---
         virtual_surface.blit(track_image, (0, 0))
