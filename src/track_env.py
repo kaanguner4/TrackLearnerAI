@@ -21,10 +21,12 @@ class TrackEnvironment:
         self.checkpoint_mask = None
         self.finish_line_mask = None
         # Checkpointler artık sadece merkez değil, çizginin iki ucunu da tutan sözlükler olacak
-        self.checkpoints = [] 
-        self.finish_line = None 
+        self.checkpoints = []
+        self.finish_line = None
+        self.start_angle = 180  # Varsayilan, _process_track sonrasi hesaplanacak
 
         self._process_track()
+        self._calculate_start_angle()
     
     def _process_track(self):
         hsv_img = cv2.cvtColor(self.track_image, cv2.COLOR_BGR2HSV)
@@ -123,6 +125,14 @@ class TrackEnvironment:
             sorted_cps.reverse()
 
         return sorted_cps
+
+    def _calculate_start_angle(self):
+        """Finish line'dan ilk checkpoint'e dogru olan aciyi hesaplar."""
+        if self.finish_line is None or not self.checkpoints:
+            return
+        sx, sy = self.finish_line['center']
+        tx, ty = self.checkpoints[0]['center']
+        self.start_angle = math.degrees(math.atan2(ty - sy, tx - sx))
 
     def check_collision(self, x , y):
         if 0 <= int(x) < self.width and 0 <= int(y) < self.height:

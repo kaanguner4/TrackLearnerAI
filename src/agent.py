@@ -6,7 +6,7 @@ class Agent:
         self.track_env = track_env
         self.x, self.y = start_position
         self.prev_x, self.prev_y = start_position # Önceki konumu tutacak
-        self.angle = 180 
+        self.angle = track_env.start_angle
         self.speed = 0
         self.max_speed = 5
         self.acceleration = 0.2

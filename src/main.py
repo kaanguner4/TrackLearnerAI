@@ -1,6 +1,8 @@
 import pygame
 import sys
 import os
+import glob
+import math
 import neat
 from track_env import TrackEnvironment
 from agent import Agent
@@ -30,6 +32,83 @@ crash_font = None
 generation = 0
 
 
+def show_track_selector():
+    pygame.init()
+
+    # Pist dosyalarini bul ve sirala
+    track_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'tracks')
+    track_files = sorted(glob.glob(os.path.join(track_dir, 'track*.png')))
+
+    if not track_files:
+        print("Hata: assets/tracks/ klasorunde pist bulunamadi!")
+        sys.exit(1)
+
+    # Pencere ayarlari
+    padding = 30
+    cols = 2
+    rows = (len(track_files) + cols - 1) // cols
+    thumb_w, thumb_h = 380, 280
+    win_w = cols * thumb_w + (cols + 1) * padding
+    win_h = rows * thumb_h + (rows + 1) * padding + 60
+
+    selector_screen = pygame.display.set_mode((win_w, win_h))
+    pygame.display.set_caption("TrackLearnerAI - Pist Sec")
+
+    title_font = pygame.font.SysFont(None, 48)
+    label_font = pygame.font.SysFont(None, 28)
+
+    # Thumbnail'leri yukle
+    thumbnails = []
+    for path in track_files:
+        img = pygame.image.load(path).convert()
+        img = pygame.transform.smoothscale(img, (thumb_w, thumb_h))
+        name = os.path.splitext(os.path.basename(path))[0].capitalize()
+        thumbnails.append((img, name, path))
+
+    selected_path = None
+    while selected_path is None:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                for idx, (_, _, path) in enumerate(thumbnails):
+                    col = idx % cols
+                    row = idx // cols
+                    x = padding + col * (thumb_w + padding)
+                    y = 60 + padding + row * (thumb_h + padding)
+                    if x <= mx <= x + thumb_w and y <= my <= y + thumb_h:
+                        selected_path = path
+
+        selector_screen.fill((30, 30, 30))
+
+        title = title_font.render("Pist Sec", True, (255, 255, 255))
+        selector_screen.blit(title, (win_w // 2 - title.get_width() // 2, 15))
+
+        mx, my = pygame.mouse.get_pos()
+        for idx, (img, name, path) in enumerate(thumbnails):
+            col = idx % cols
+            row = idx // cols
+            x = padding + col * (thumb_w + padding)
+            y = 60 + padding + row * (thumb_h + padding)
+
+            hovered = x <= mx <= x + thumb_w and y <= my <= y + thumb_h
+            border_color = (0, 200, 0) if hovered else (100, 100, 100)
+            border_width = 3 if hovered else 1
+
+            pygame.draw.rect(selector_screen, border_color, (x - border_width, y - border_width, thumb_w + border_width * 2, thumb_h + border_width * 2), border_width)
+            selector_screen.blit(img, (x, y))
+
+            label = label_font.render(name, True, (255, 255, 255))
+            selector_screen.blit(label, (x + thumb_w // 2 - label.get_width() // 2, y + thumb_h + 5))
+
+        pygame.display.flip()
+
+    pygame.quit()
+    return selected_path
+
+
 def evol_genomes(genomes, config):
     global env, screen, virtual_surface, clock, window_width, window_height, track_image, hud_font, checkpoint_font, crash_font, generation
     generation += 1
@@ -50,6 +129,19 @@ def evol_genomes(genomes, config):
 
     # Ajanların sonsuza kadar kendi etrafında dönmesini engellemek için zamanlayıcılar
     frames_since_last_checkpoint = [0] * len(agents)
+    # Ajan ilk olarak son checkpoint'ten geçerse tek seferlik ceza vermek için
+    wrong_way_penalized = [False] * len(agents)
+    num_checkpoints = len(env.checkpoints)
+
+    # Her ajan icin sonraki checkpoint'e olan baslangic mesafesini hesapla
+    def _dist_to_checkpoint(ax, ay, cp_idx):
+        if cp_idx < num_checkpoints:
+            cx, cy = env.checkpoints[cp_idx]['center']
+        else:
+            cx, cy = env.finish_line['center']
+        return math.hypot(cx - ax, cy - ay)
+
+    prev_dist_to_cp = [_dist_to_checkpoint(agent.x, agent.y, 0) for agent in agents]
 
     running = True
     while running and len(agents) > 0:
@@ -99,24 +191,58 @@ def evol_genomes(genomes, config):
 
             # 4. Checkpoint kontrolü ve fitness güncellemesi (look-ahead ile)
             look_ahead = 5
-            max_check = min(agent.current_checkpoint + look_ahead, len(env.checkpoints))
+            max_check = min(agent.current_checkpoint + look_ahead, num_checkpoints)
+            passed_checkpoint = False
             for cp_idx in range(agent.current_checkpoint, max_check):
                 if env.is_checkpoint_passed(agent.prev_x, agent.prev_y, agent.x, agent.y, cp_idx):
                     # Atlanan checkpoint'ler için de puan ver
                     checkpoints_passed = cp_idx - agent.current_checkpoint + 1
                     ge[i].fitness += 100 * checkpoints_passed
+
+                    # Hizli gecis bonusu: checkpoint'i ne kadar az frame'de gecersen o kadar bonus
+                    frames_used = frames_since_last_checkpoint[i]
+                    if frames_used < 150:
+                        ge[i].fitness += (150 - frames_used) * 0.2  # max +30 bonus
+
                     agent.current_checkpoint = cp_idx + 1
                     frames_since_last_checkpoint[i] = 0
+                    passed_checkpoint = True
+                    # Yeni checkpoint icin mesafe referansini guncelle
+                    prev_dist_to_cp[i] = _dist_to_checkpoint(agent.x, agent.y, agent.current_checkpoint)
                     break
 
-            # 5. Mesafe bazlı sürekli fitness ödülü
-            if agent.speed > 0:
-                ge[i].fitness += agent.speed * 0.1
+            # 4.1 İlk checkpoint yerine son checkpoint'ten geçerse eksi puan ver (ters yön teşhisi)
+            if (not passed_checkpoint and not wrong_way_penalized[i]
+                and agent.current_checkpoint == 0 and num_checkpoints > 1):
+                last_cp_idx = num_checkpoints - 1
+                if env.is_checkpoint_passed(agent.prev_x, agent.prev_y, agent.x, agent.y, last_cp_idx):
+                    ge[i].fitness -= 100
+                    wrong_way_penalized[i] = True
+
+            # 5. Sonraki checkpoint'e yakinlik odulu (hiz odulunun yerine)
+            curr_dist = _dist_to_checkpoint(agent.x, agent.y, agent.current_checkpoint)
+            if curr_dist < prev_dist_to_cp[i]:
+                ge[i].fitness += (prev_dist_to_cp[i] - curr_dist) * 0.3
+            prev_dist_to_cp[i] = curr_dist
 
             # 6. Zaman aşımı kontrolü: Eğer ajan uzun süre checkpoint geçemezse öldür
             if frames_since_last_checkpoint[i] > 300:  # ~5 saniye (60 FPS)
                 agent.is_alive = False
                 ge[i].fitness -= 50
+
+            # 7. Çarpışma kontrolü
+            if env.check_collision(agent.x, agent.y):
+                agent.is_alive = False
+                ge[i].fitness -= 25
+
+            # 8. Tur tamamlama kontrolu: Tum checkpoint'ler gecildiyse ve bitis cizgisini gectiyse
+            if agent.current_checkpoint >= num_checkpoints:
+                if env.is_finish_line_crossed(agent.prev_x, agent.prev_y, agent.x, agent.y):
+                    ge[i].fitness += 500  # Tur tamamlama bonusu
+                    agent.is_alive = False  # Turu bitirdi, vakit kaybettirmesin
+
+            # 9. Eğer ajan ters yönde hareket ediyorsa
+            
 
         # Eğer yaşayan hiç ajan kalmadıysa bu jenerasyonu bitir
         if alive_agents == 0:
@@ -181,12 +307,11 @@ def run_neat(config_path):
 
     print(f"Evrim tamamlandı! En iyi genomun ve fitness değeri:\n {winner} / {winner.fitness:.2f}")
 
-def setup_pygame_and_environment():
+def setup_pygame_and_environment(track_path):
     global env, screen, virtual_surface, clock, window_width, window_height, track_image, hud_font, checkpoint_font
-    
+
     pygame.init()
-    
-    track_path = "assets/tracks/track2.png"
+
     env = TrackEnvironment(track_path)
     
     infoObject = pygame.display.Info()
@@ -216,12 +341,15 @@ def setup_pygame_and_environment():
     checkpoint_font = pygame.font.SysFont(None, 20)
 
 if __name__ == "__main__":
-    # 1. Pygame ve Çevreyi Hazırla
-    setup_pygame_and_environment()
+    # 1. Pist Secim Ekranini Goster
+    selected_track = show_track_selector()
 
-    # 2. config dosyasının yolunu bul (Ana dizinde olduğunu varsayıyoruz)
+    # 2. Pygame ve Cevreyi Hazirla
+    setup_pygame_and_environment(selected_track)
+
+    # 3. config dosyasinin yolunu bul (Ana dizinde oldugunu varsayiyoruz)
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, '..', 'config-feedforward.txt')
 
-    # 3. NEAT algoritmasını çalıştır
+    # 4. NEAT algoritmasini calistir
     run_neat(config_path)
