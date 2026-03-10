@@ -33,7 +33,7 @@ class Agent:
         radians = math.radians(self.angle)
         self.x += math.cos(radians) * self.speed
         self.y += math.sin(radians) * self.speed
-        self.distance_driven += self.speed
+        self.distance_driven += abs(self.speed)
 
         # 2. Çarpışma kontrolü
         if self.track_env.check_collision(self.x, self.y):

@@ -1,10 +1,20 @@
 import cv2
 import numpy as np
 import math
+import os
 
 class TrackEnvironment:
     def __init__(self, image_path):
+        # 1. Dosya yolunun fiziksel olarak var olup olmadığını kontrol et
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Hata: Belirtilen dosya yolu bulunamadı -> '{image_path}'")
+            
         self.track_image = cv2.imread(image_path)
+        
+        # 2. Dosya mevcut olsa bile OpenCV tarafından geçerli bir resim olarak okunup okunamadığını kontrol et
+        if self.track_image is None:
+            raise ValueError(f"Hata: Görüntü okunamadı veya geçersiz/bozuk bir format -> '{image_path}'")
+            
         self.height, self.width, _ = self.track_image.shape
     
         self.border_mask = None

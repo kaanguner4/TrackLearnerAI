@@ -41,7 +41,8 @@ def main():
     clock = pygame.time.Clock()
     
     # --- 2. OYUN NESNELERİNİ OLUŞTUR ---
-    agent = Agent((800, 400), env)
+    start_position= (env.finish_line['center'][0], env.finish_line['center'][1])
+    agent = Agent(start_position, env)
     track_image = pygame.image.load(track_path).convert()
 
     hud_font = pygame.font.SysFont(None, 36)
@@ -86,7 +87,7 @@ def main():
         # --- TUR (FINISH) SAYACI MANTIĞI ---
         # Eski finish_line crossed mantığı yerine çizgi kesişimi ile tur ölçümü yapıyoruz
         if env.is_finish_line_crossed(agent.prev_x, agent.prev_y, agent.x, agent.y):
-            if agent.current_checkpoint == 62:
+            if agent.current_checkpoint == int(len(env.checkpoints)):
                 lap_count += 1
                 agent.current_checkpoint = 0 # Yeni tur!
 
@@ -105,7 +106,7 @@ def main():
         agent.draw(virtual_surface)
 
         # --- HUD (BİLGİ EKRANI) ÇİZİMİ ---
-        hud_bg = pygame.Surface((380, 120))
+        hud_bg = pygame.Surface((380, 380)) 
         hud_bg.set_alpha(180) 
         hud_bg.fill(BLACK)
         virtual_surface.blit(hud_bg, (10, 10))
@@ -113,7 +114,8 @@ def main():
         hud_texts = [
             f"FPS: {int(clock.get_fps())}",
             f"Geçilen Checkpoint: {agent.current_checkpoint} / {len(env.checkpoints)}",
-            f"Tamamlanan Tur: {lap_count}"
+            f"Tamamlanan Tur: {lap_count}",
+            f"Hız: {agent.speed:.2f} px/frame"
         ]
         
         for i, text in enumerate(hud_texts):
