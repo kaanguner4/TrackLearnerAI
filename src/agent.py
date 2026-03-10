@@ -19,7 +19,10 @@ class Agent:
 
         self.width = 20
         self.height = 10
-        self.color = (0, 0, 0) # Sarı
+        self.color = (0, 0, 255) # MAVİ YAPTIK
+        
+        # AJAN DOĞDUĞU AN İLK SENSÖR VERİSİNİ ALSIN DİYE EKLENEN SATIR:
+        self._update_radars()
 
     def update(self):
         if not self.is_alive:
@@ -39,18 +42,8 @@ class Agent:
         if self.track_env.check_collision(self.x, self.y):
             self.is_alive = False
             return
-        
-        # 3. Çizgi Kesişimi Kontrolü (Look-Ahead Mantığı)
-        look_ahead = 5
-        max_check = min(self.current_checkpoint + look_ahead, len(self.track_env.checkpoints))
-        
-        for i in range(self.current_checkpoint, max_check):
-            # Araba (eski_konum -> yeni_konum) hareket ederken checkpoint çizgisini kesti mi?
-            if self.track_env.is_checkpoint_passed(self.prev_x, self.prev_y, self.x, self.y, i):
-                self.current_checkpoint = i + 1
-                break 
 
-        # 4. Radar verilerini güncelle
+        # 3. Radar verilerini güncelle
         self._update_radars()
 
     def _update_radars(self):
@@ -73,12 +66,15 @@ class Agent:
         self.radars.append((radar_x, radar_y, length))
 
     def get_data(self):
-        radar_distances = [radar[2] for radar in self.radars]
-        return radar_distances + [self.speed]
+        # Radar mesafelerini 0-1 arasına normalize et (max 200 piksel)
+        radar_distances = [radar[2] / 200.0 for radar in self.radars]
+        # Hızı -1 ile 1 arasına normalize et
+        normalized_speed = self.speed / self.max_speed
+        return radar_distances + [normalized_speed]
     
     def draw(self, screen):
         if self.is_alive:
-            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), 5)
+            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), 8)
             for radar in self.radars:
                 radar_pos = (radar[0], radar[1])
                 pygame.draw.line(screen, (255, 0, 255), (int(self.x), int(self.y)), radar_pos, 1) # Mor radar çizgisi
