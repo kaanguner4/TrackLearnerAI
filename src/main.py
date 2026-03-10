@@ -6,6 +6,7 @@ import math
 import neat
 from track_env import TrackEnvironment
 from agent import Agent
+from network_visualizer import NetworkVisualizer
 
 # Renkler
 WHITE = (255, 255, 255)
@@ -30,6 +31,7 @@ hud_font = None
 checkpoint_font = None
 crash_font = None
 generation = 0
+nn_viz = NetworkVisualizer()
 
 
 def show_track_selector():
@@ -277,6 +279,19 @@ def evol_genomes(genomes, config):
         for idx, text in enumerate(hud_texts):
             rendered_text = hud_font.render(text, True, WHITE)
             virtual_surface.blit(rendered_text, (20, 20 + (idx * 40)))
+
+        # En iyi hayattaki ajanin neural network'unu gorsellestir
+        best_idx = None
+        best_fitness = -float('inf')
+        for i, agent in enumerate(agents):
+            if agent.is_alive and ge[i].fitness > best_fitness:
+                best_fitness = ge[i].fitness
+                best_idx = i
+        if best_idx is not None:
+            nn_viz.draw(
+                virtual_surface, nets[best_idx], ge[best_idx],
+                env.width - nn_viz.width - 10, env.height - nn_viz.height - 10
+            )
 
         # Ekrana Yansıtma
         scaled_surface = pygame.transform.smoothscale(virtual_surface, (window_width, window_height))
