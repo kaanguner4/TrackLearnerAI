@@ -186,7 +186,7 @@ def setup_pygame_and_environment():
     
     pygame.init()
     
-    track_path = "assets/tracks/track1.png"
+    track_path = "assets/tracks/track2.png"
     env = TrackEnvironment(track_path)
     
     infoObject = pygame.display.Info()

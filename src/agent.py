@@ -6,7 +6,7 @@ class Agent:
         self.track_env = track_env
         self.x, self.y = start_position
         self.prev_x, self.prev_y = start_position # Önceki konumu tutacak
-        self.angle = 0 
+        self.angle = 180 
         self.speed = 0
         self.max_speed = 5
         self.acceleration = 0.2
@@ -74,7 +74,7 @@ class Agent:
     
     def draw(self, screen):
         if self.is_alive:
-            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), 8)
+            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), 2)
             for radar in self.radars:
                 radar_pos = (radar[0], radar[1])
                 pygame.draw.line(screen, (255, 0, 255), (int(self.x), int(self.y)), radar_pos, 1) # Mor radar çizgisi
