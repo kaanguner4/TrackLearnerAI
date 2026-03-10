@@ -74,7 +74,7 @@ class Agent:
     
     def draw(self, screen):
         if self.is_alive:
-            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), 2)
+            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), 8)
             for radar in self.radars:
                 radar_pos = (radar[0], radar[1])
                 pygame.draw.line(screen, (255, 0, 255), (int(self.x), int(self.y)), radar_pos, 1) # Mor radar çizgisi
